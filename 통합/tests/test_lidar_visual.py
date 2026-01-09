@@ -17,7 +17,7 @@
 -------------------------------------------------------------------
 """
 
-from Lib_LiDAR import libLidar
+from modules.lidar.Lib_LiDAR import libLidar
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -27,14 +27,16 @@ import time
 # ==================== 설정 ====================
 LIDAR_PORT = 'COM3'  # 라이다 포트
 
-# 장애물 감지 설정
-OBSTACLE_ANGLE_MIN = 350    # 전방 감지 시작
-OBSTACLE_ANGLE_MAX = 10     # 전방 감지 끝
+# 장애물 감지 설정 (180도를 정면으로 설정)
+OBSTACLE_ANGLE_MIN = 170    # 전방 감지 시작 (180도 기준 좌측 10도)
+OBSTACLE_ANGLE_MAX = 190    # 전방 감지 끝 (180도 기준 우측 10도)
 OBSTACLE_DISTANCE = 500     # 위험 거리 (mm)
 
 # 시각화 설정
 MAX_DISPLAY_DISTANCE = 3000  # 최대 표시 거리 (mm)
 UPDATE_INTERVAL = 50         # 업데이트 간격 (ms)
+DISPLAY_ANGLE_MIN = 90       # 시각화 표시 최소 각도 (왼쪽)
+DISPLAY_ANGLE_MAX = 270      # 시각화 표시 최대 각도 (오른쪽)
 
 # ==================== 전역 변수 ====================
 lidar = None
@@ -96,13 +98,13 @@ def scan_worker():
             scan_data['angles'] = angles
             scan_data['distances'] = distances
 
-            # 장애물 감지
+            # 장애물 감지 (170~190도 범위)
             obstacle_detected = False
             nearest_obstacle = 0
 
             for angle, distance in zip(angles, distances):
-                # 전방 영역 체크 (350~360도 또는 0~10도)
-                if ((angle >= OBSTACLE_ANGLE_MIN) or (angle <= OBSTACLE_ANGLE_MAX)):
+                # 전방 영역 체크 (170~190도)
+                if (OBSTACLE_ANGLE_MIN <= angle <= OBSTACLE_ANGLE_MAX):
                     if distance < OBSTACLE_DISTANCE:
                         obstacle_detected = True
                         if nearest_obstacle == 0 or distance < nearest_obstacle:
@@ -116,7 +118,7 @@ def scan_worker():
 # ==================== 시각화 설정 ====================
 def setup_plot():
     """matplotlib 극좌표 플롯 설정"""
-    fig = plt.figure(figsize=(12, 10))
+    fig = plt.figure(figsize=(14, 10))
     ax = fig.add_subplot(111, projection='polar')
 
     # 플롯 설정
@@ -124,11 +126,15 @@ def setup_plot():
     ax.set_theta_zero_location('N')  # 0도를 위쪽으로
     ax.set_theta_direction(-1)        # 시계방향
 
+    # 시야각 제한 (90~270도만 표시 = 전방 180도)
+    ax.set_thetamin(DISPLAY_ANGLE_MIN)  # 90도 (왼쪽)
+    ax.set_thetamax(DISPLAY_ANGLE_MAX)  # 270도 (오른쪽)
+
     # 격자선 설정
     ax.grid(True, linestyle='--', alpha=0.5)
 
     # 제목
-    ax.set_title('라이다 360도 스캔 (실시간)',
+    ax.set_title('라이다 전방 180도 스캔 (실시간)\n정면: 180도 | 감지 범위: 170~190도',
                  fontsize=16, fontweight='bold', pad=20)
 
     # 거리 표시
@@ -178,26 +184,25 @@ def update_plot(frame, ax, scatter, obstacle_wedge, text_box):
     # ✅ 리스트를 비우고 새 wedge 추가 (in-place 수정)
     obstacle_wedge.clear()
 
-    # 350~10도 영역 (전방 20도)
+    # 170~190도 영역 (전방 20도, 180도 중심)
     wedge_color = 'red' if obstacle_detected else 'lightblue'
     wedge_alpha = 0.3 if obstacle_detected else 0.1
 
-    # 새 wedge 생성
-    new_wedges = [
-        Wedge((0, 0), OBSTACLE_DISTANCE,
-              350, 360,
-              facecolor=wedge_color, alpha=wedge_alpha,
-              edgecolor='red', linewidth=2),
-        Wedge((0, 0), OBSTACLE_DISTANCE,
-              0, 10,
-              facecolor=wedge_color, alpha=wedge_alpha,
-              edgecolor='red', linewidth=2)
-    ]
+    # 새 wedge 생성 (170~190도 단일 영역)
+    new_wedge = Wedge(
+        (0, 0),
+        OBSTACLE_DISTANCE,
+        OBSTACLE_ANGLE_MIN,  # 170도
+        OBSTACLE_ANGLE_MAX,  # 190도
+        facecolor=wedge_color,
+        alpha=wedge_alpha,
+        edgecolor='red',
+        linewidth=2
+    )
 
     # ✅ 리스트에 추가 (in-place)
-    for w in new_wedges:
-        ax.add_patch(w)
-        obstacle_wedge.append(w)
+    ax.add_patch(new_wedge)
+    obstacle_wedge.append(new_wedge)
 
     # 상태 텍스트 업데이트
     status_text = f"포인트 수: {len(distances):,}개\n"
@@ -239,14 +244,19 @@ def main():
     # 초기 플롯 요소
     scatter = ax.scatter([], [], c=[], s=20, alpha=0.6)
 
-    obstacle_wedge = [
-        Wedge((0, 0), OBSTACLE_DISTANCE, 350, 360,
-              facecolor='lightblue', alpha=0.1),
-        Wedge((0, 0), OBSTACLE_DISTANCE, 0, 10,
-              facecolor='lightblue', alpha=0.1)
-    ]
-    for w in obstacle_wedge:
-        ax.add_patch(w)
+    # 초기 감지 영역 wedge (170~190도)
+    initial_wedge = Wedge(
+        (0, 0),
+        OBSTACLE_DISTANCE,
+        OBSTACLE_ANGLE_MIN,  # 170도
+        OBSTACLE_ANGLE_MAX,  # 190도
+        facecolor='lightblue',
+        alpha=0.1,
+        edgecolor='blue',
+        linewidth=1
+    )
+    ax.add_patch(initial_wedge)
+    obstacle_wedge = [initial_wedge]
 
     # 상태 텍스트
     text_box = ax.text(0.02, 0.98, '',
