@@ -1,12 +1,18 @@
 #include <Car_Library.h>
 
 // ==================== 핀 설정 ====================
-// DC 모터 (구동 모터)
-int motorA1 = 3;    // 구동 모터 IN1 (PWM)
-int motorA2 = 5;    // 구동 모터 IN2 (PWM)
+// 차동 구동 방식: 좌/우 바퀴 독립 제어 + 서보 조향
+// 모터 드라이버 1: 좌측 바퀴
+int motorLeft_IN1 = 2;    // 모터 드라이버 1 IN1 (좌)
+int motorLeft_IN2 = 3;    // 모터 드라이버 1 IN2 (파)
 
-// 서보 모터 (조향) - Car_Library에서 제어
-int SERVO_PIN = 9;  // 서보모터 PWM 핀
+// 모터 드라이버 2: 우측 바퀴
+int motorRight_IN1 = 4;   // 모터 드라이버 2 IN1 (쥬)
+int motorRight_IN2 = 5;   // 모터 드라이버 2 IN2 (노)
+
+// 모터 드라이버 3: 서보 모터 (조향)
+int servo_IN1 = 6;        // 모터 드라이버 3 IN1 (갈)
+int servo_IN2 = 7;        // 모터 드라이버 3 IN2 (빨)
 
 // 초음파 센서 6개
 int trigPins[6] = {22, 24, 26, 28, 30, 32};  // Trig 핀 배열
@@ -41,12 +47,17 @@ int current_steering_angle = 90;  // 현재 조향 각도
 void setup() {
   Serial.begin(9600);
 
-  // DC 모터 핀 설정
-  pinMode(motorA1, OUTPUT);
-  pinMode(motorA2, OUTPUT);
+  // 좌측 바퀴 모터 핀 설정
+  pinMode(motorLeft_IN1, OUTPUT);
+  pinMode(motorLeft_IN2, OUTPUT);
 
-  // 서보모터 핀 설정
-  pinMode(SERVO_PIN, OUTPUT);
+  // 우측 바퀴 모터 핀 설정
+  pinMode(motorRight_IN1, OUTPUT);
+  pinMode(motorRight_IN2, OUTPUT);
+
+  // 서보모터 핀 설정 (모터 드라이버로 제어)
+  pinMode(servo_IN1, OUTPUT);
+  pinMode(servo_IN2, OUTPUT);
 
   // 초음파 센서 6개 핀 설정
   for (int i = 0; i < 6; i++) {
@@ -124,43 +135,96 @@ void executeCommand(char cmd) {
   }
 }
 
-// ==================== DC 모터 제어 함수 ====================
+// ==================== DC 모터 제어 함수 (차동 구동) ====================
 
-// 전진 (IN1=HIGH, IN2=LOW)
+// 좌측 바퀴 전진 (반대 방향으로 수정)
+void motorLeft_forward(int speed) {
+  analogWrite(motorLeft_IN1, 0);
+  analogWrite(motorLeft_IN2, speed);
+}
+
+// 좌측 바퀴 후진 (반대 방향으로 수정)
+void motorLeft_backward(int speed) {
+  analogWrite(motorLeft_IN1, speed);
+  analogWrite(motorLeft_IN2, 0);
+}
+
+// 좌측 바퀴 정지
+void motorLeft_stop() {
+  analogWrite(motorLeft_IN1, 0);
+  analogWrite(motorLeft_IN2, 0);
+}
+
+// 우측 바퀴 전진
+void motorRight_forward(int speed) {
+  analogWrite(motorRight_IN1, speed);
+  analogWrite(motorRight_IN2, 0);
+}
+
+// 우측 바퀴 후진
+void motorRight_backward(int speed) {
+  analogWrite(motorRight_IN1, 0);
+  analogWrite(motorRight_IN2, speed);
+}
+
+// 우측 바퀴 정지
+void motorRight_stop() {
+  analogWrite(motorRight_IN1, 0);
+  analogWrite(motorRight_IN2, 0);
+}
+
+// ==================== 통합 모터 제어 함수 ====================
+
+// 전진 (양쪽 바퀴 같은 속도)
 void motor_forward(int speed) {
-  analogWrite(motorA1, speed);
-  analogWrite(motorA2, 0);
+  motorLeft_forward(speed);
+  motorRight_forward(speed);
 }
 
-// 후진 (IN1=LOW, IN2=HIGH)
+// 후진 (양쪽 바퀴 같은 속도)
 void motor_backward(int speed) {
-  analogWrite(motorA1, 0);
-  analogWrite(motorA2, speed);
+  motorLeft_backward(speed);
+  motorRight_backward(speed);
 }
 
-// 정지 (IN1=LOW, IN2=LOW)
+// 정지 (양쪽 바퀴 모두 정지)
 void motor_stop() {
-  analogWrite(motorA1, 0);
-  analogWrite(motorA2, 0);
+  motorLeft_stop();
+  motorRight_stop();
 }
 
 // ==================== 서보 조향 제어 함수 ====================
+// 주의: 서보모터를 모터 드라이버로 제어하는 경우
+// 일반적으로 서보모터는 PWM 신호로 제어하지만,
+// 모터 드라이버를 사용하는 경우 다르게 동작할 수 있습니다.
 
-// 서보 각도 설정 (PWM 방식)
+// 서보 각도 설정 (모터 드라이버 제어 방식) - 방향 수정
 void setServoAngle(int angle) {
-  // 0~180도를 PWM 듀티 사이클로 변환
-  // 서보모터: 0도=1ms(약 5%), 90도=1.5ms(약 7.5%), 180도=2ms(약 10%)
-  int pulseWidth = map(angle, 0, 180, 1000, 2000);  // 마이크로초
+  // 각도를 PWM 듀티로 변환 (0~255)
+  // 중앙(90도) = 중립, 작으면 왼쪽, 크면 오른쪽
 
-  // PWM 신호 생성 (간단한 방식)
-  for (int i = 0; i < 10; i++) {  // 10번 반복으로 안정화
-    digitalWrite(SERVO_PIN, HIGH);
-    delayMicroseconds(pulseWidth);
-    digitalWrite(SERVO_PIN, LOW);
-    delayMicroseconds(20000 - pulseWidth);  // 20ms 주기
+  if (angle < 90) {
+    // 왼쪽 회전 (IN2 방향으로 수정)
+    int power = map(90 - angle, 0, 90, 0, 255);
+    analogWrite(servo_IN1, 0);
+    analogWrite(servo_IN2, power);
+  }
+  else if (angle > 90) {
+    // 오른쪽 회전 (IN1 방향으로 수정)
+    int power = map(angle - 90, 0, 90, 0, 255);
+    analogWrite(servo_IN1, power);
+    analogWrite(servo_IN2, 0);
+  }
+  else {
+    // 중앙 (정지)
+    analogWrite(servo_IN1, 0);
+    analogWrite(servo_IN2, 0);
   }
 
   current_steering_angle = angle;
+
+  // 서보가 움직일 시간 대기
+  delay(50);
 }
 
 // 중앙 (직진)

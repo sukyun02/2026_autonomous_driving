@@ -13,13 +13,8 @@
 -------------------------------------------------------------------
 """
 
-import sys
-import os
-# 프로젝트 루트 디렉토리를 파이썬 경로에 추가
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-
 from utils import Function_Library as fl
-from modules.lidar.Lib_LiDAR import libLidar
+from lidar.Lib_LiDAR import libLidar
 import config
 
 # ==================== 전역 변수 (센서 객체) ====================
@@ -198,12 +193,13 @@ def read_ultrasonic():
         5) 구버전 호환 (단일 숫자만 오면 'F' 키에 저장)
     """
     global ultrasonic_data, ultrasonic_distance
+    
 
     # 시리얼 버퍼에 데이터가 있는지 확인
     if arduino.in_waiting > 0:
         try:
             # 한 줄 읽기 (\n까지 읽고 디코딩)
-            line = arduino.readline().decode('utf-8').strip()
+            line = arduino.readline().decode('utf-8').strip() #결과 예시 "F:25,FL:30,FR:28,R:50,RL:45,RR:48"
 
             # 형식 1: "F:25,FL:30,..." (신규 6개 센서 형식)
             if ':' in line and ',' in line:

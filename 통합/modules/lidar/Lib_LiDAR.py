@@ -12,7 +12,7 @@ class libLidar(object):
         try:
             print("모터 정지 중...")
             self.lidar.stop_motor()
-            time
+            time.sleep(0.5)
         
             print("버퍼 클리어 중..")
             self.lidar.clear_input()
@@ -93,7 +93,11 @@ class libLidar(object):
 
     def getAngleRange(self, scan, minAngle, maxAngle):
         data = np.array(scan)
-        condition = np.where((data[:, 0] < maxAngle) & (data[:, 0] > minAngle))
+        # 각도 범위가 0도를 넘어가는 경우 처리 (예: 350~10도)
+        if minAngle > maxAngle:
+            condition = np.where((data[:, 0] < maxAngle) | (data[:, 0] > minAngle))
+        else:
+            condition = np.where((data[:, 0] < maxAngle) & (data[:, 0] > minAngle))
         return data[condition]
 
     def getDistanceRange(self, scan, minDist, maxDist):
@@ -103,7 +107,11 @@ class libLidar(object):
 
     def getAngleDistanceRange(self, scan, minAngle, maxAngle, minDist, maxDist):
         data = np.array(scan)
-        condition = np.where((data[:, 0] < maxAngle) & (data[:, 0] > minAngle) & (data[:, 1] < maxDist) & (data[:, 1] > minDist))
+        # 각도 범위가 0도를 넘어가는 경우 처리 (예: 350~10도)
+        if minAngle > maxAngle:
+            condition = np.where(((data[:, 0] < maxAngle) | (data[:, 0] > minAngle)) & (data[:, 1] < maxDist) & (data[:, 1] > minDist))
+        else:
+            condition = np.where((data[:, 0] < maxAngle) & (data[:, 0] > minAngle) & (data[:, 1] < maxDist) & (data[:, 1] > minDist))
         return data[condition]
 
     def get_far_distance(self, scan, minAngle, maxAngle):
@@ -118,4 +126,4 @@ class libLidar(object):
         if len(datas) > 0:
             min_idx = datas[:, 1].argmin()
             return datas[min_idx]
-        return None
+        return [0, 0]  # None 대신 기본값 반환

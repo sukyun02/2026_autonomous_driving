@@ -20,8 +20,13 @@
 -------------------------------------------------------------------
 """
 
-import sensors
-import control
+import sys
+import os
+# 현재 디렉토리를 파이썬 경로에 추가
+sys.path.append(os.path.dirname(__file__))
+
+from modules.vehicle import sensors
+from modules.vehicle import control
 import config
 
 # ==================== 메인 자율주행 루프 ====================

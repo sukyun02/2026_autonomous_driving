@@ -19,7 +19,7 @@
 -------------------------------------------------------------------
 """
 
-from Lib_LiDAR import libLidar
+from modules.lidar.Lib_LiDAR import libLidar
 import time
 
 # ==================== 설정 ====================

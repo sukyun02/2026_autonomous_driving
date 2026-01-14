@@ -12,8 +12,13 @@
 -------------------------------------------------------------------
 """
 
-import Function_Library as fl
-import sensors
+import sys
+import os
+# 프로젝트 루트 디렉토리를 파이썬 경로에 추가
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+
+from utils import Function_Library as fl
+from modules.vehicle import sensors
 import config
 
 # ==================== 모터 명령 전송 ====================
